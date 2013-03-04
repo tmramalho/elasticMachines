@@ -15,25 +15,24 @@ class Automaton(object):
 		Constructor
 		'''
 	
-	def stateEvolve(self, cells):
+	def stateEvolve(self, cs):
 		self.newCells = set()
-		for c in cells:
+		for j in xrange(cs.size):
 			acc = 0
-			for pn in c.nn:
-				acc += cells[pn].state
+			for pn in cs.nn[j]:
+				acc += cs.state[pn]
 			if acc == 1:
-				if c.state == 1:
-					c.newState = 0
+				if cs.state[j] == 1:
+					cs.newState[j] = 0
 				else:
-					c.newState = 1
+					cs.newState[j] = 1
 			elif acc > 3 and acc < 5:
-				if c.state == 0:
-					if not c.fixed:
-						self.newCells.add((c.x[3], c.y[3]))
-					c.newState = 1
+				if cs.state[j] == 0:
+					if not cs.fixed[j]:
+						self.newCells.add((cs.x[j, 3], cs.y[j, 3]))
+					cs.newState[j] = 1
 				else:
-					c.newState = 0
+					cs.newState[j] = 0
 			elif acc > 5:
-				c.newState = 0
-		for c in cells:
-			c.updateState()
+				cs.newState[j] = 0
+		cs.updateState()

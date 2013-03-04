@@ -38,6 +38,10 @@ class Plotter(object):
 		self.maxxlim = 1.01
 		self.minylim = -0.01
 		self.maxylim = 0.5
+	
+	def setLims(self, maxX, maxY):
+		self.maxxlim = maxX+0.01
+		self.maxylim = 3*maxY+0.01
 		
 	def plotDelaunay(self, xp, yp, triangles):
 		for t in triangles:
@@ -55,7 +59,7 @@ class Plotter(object):
 	def next(self):
 		self.i += 1
 	
-	def plotVoronoi(self, cells, xp, yp, edges, circumcenters, neighbors, triangles):
+	def plotVoronoi(self, cs, xp, yp, edges, circumcenters, neighbors, triangles):
 		fig = plt.figure(figsize=self.figsize)
 		ax = fig.add_subplot(1, 1, 1)
 		vertices = [[] for _ in xrange(len(xp))] #array with number of points
@@ -71,8 +75,8 @@ class Plotter(object):
 			v = v[idx]
 			vertices[i] = v
 		fc = []
-		for i,c in enumerate(cells):
-			if c.state == 1:
+		for i in xrange(cs.size):
+			if cs.state[i] == 1:
 				fc.append('g')
 			else:
 				fc.append('r')
@@ -87,18 +91,18 @@ class Plotter(object):
 		A= A- np.mean(A, 1)[:, None]
 		return np.argsort(np.arctan2(A[1, :], A[0, :]))
 		
-	def plotCellStates(self, cells, xp, yp, edges, circumcenters, neighbors):
+	def plotCellStates(self, cs, xp, yp, edges, circumcenters, neighbors):
 		fig = plt.figure(figsize=self.figsize)
 		ax = fig.add_subplot(1, 1, 1)
 		#xp, yp is same as c.x, c.y
-		for i,c in enumerate(cells):
-			if c.state == 1:
+		for i in xrange(cs.size):
+			if cs.state[i] == 1:
 				co = 'g'
 			else:
 				co = 'r'
-			circle = plt.Circle((c.x[3], c.y[3]), radius=self.dh, color=co, alpha = 0.5)
+			circle = plt.Circle((cs.x[i, 3], cs.y[i, 3]), radius=self.dh, color=co, alpha = 0.5)
 			ax.add_patch(circle)
-			ax.text(c.x[3]+0.01, c.y[3]+0.01, str(i))
+			ax.text(cs.x[i, 3]+0.01, cs.y[i, 3]+0.01, str(i))
 			
 #		for i in xrange(len(neighbors)):
 #			j = neighbors[i][0]
@@ -120,7 +124,7 @@ class Plotter(object):
 		plt.savefig(self.path + "state"+str(self.i).zfill(3)+".png")
 		plt.clf()
 		
-	def drawCells(self, cells, triangles, xp, yp):
+	def drawCells(self, cs, triangles, xp, yp):
 		dic = self.mapPointsToPos(xp, yp)
 		#fx, fy = self.createFakePoints(xp, yp)
 		ee, op = self.findExternalEdges(triangles, xp, yp)
@@ -148,13 +152,12 @@ class Plotter(object):
 			v = v[vidx]
 			vertices.append(v)
 			#create array with state colors
-			c = cells[cidx]
-			if c.state == 1:
+			if cs.state[cidx] == 1:
 				fstate.append('g')
 			else:
 				fstate.append('r')
 			#array with pressure values
-			fpress.append(c.V)
+			fpress.append(cs.V[cidx])
 		
 		coll = PolyCollection(vertices, facecolors=fstate, edgecolors='k', alpha = 0.5)
 		
