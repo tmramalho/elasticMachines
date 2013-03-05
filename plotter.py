@@ -130,6 +130,42 @@ class Plotter(object):
 		ee, op = self.findExternalEdges(triangles, xp, yp)
 		fx, fy = self.createAuxPoints(ee, op, xp, yp)
 		tri = triang.Triangulation(fx,fy)
+		vertices, fstate, fpress = self.createVertexArrayFromTriangulation(cs, tri, dic)
+		
+		coll = PolyCollection(vertices, facecolors=fstate, edgecolors='k', alpha = 0.5)
+		
+		fig = plt.figure(figsize=self.figsize)
+		ax = fig.add_subplot(1, 1, 1)
+		ax.add_collection(coll)
+		plt.plot(xp, yp, 'o')
+		plt.xlim(self.minxlim, self.maxxlim)
+		plt.ylim(self.minylim, self.maxylim)
+		plt.savefig(self.path + "vor"+str(self.i).zfill(3)+".png")
+		
+		for e in tri.edge_db:
+			plt.plot(tri.x[e],tri.y[e], color = 'b')
+		for e in ee:
+			ei = np.array(e)
+			plt.plot(xp[ei],yp[ei], color = 'r')
+		plt.xlim(self.minxlim - 0.2, self.maxxlim + 0.2)
+		plt.ylim(self.minylim - 0.2, self.maxylim + 0.2)
+		plt.savefig(self.path + "vorDebug"+str(self.i)+".png")
+		plt.clf()
+		
+		fig = plt.figure(figsize=self.figsize)
+		ax = fig.add_subplot(1, 1, 1)
+		#jet = plt.get_cmap('jet') 
+		cNorm  = None #colors.Normalize(vmin=0, vmax=0.01)
+		coll = PolyCollection(vertices, array=np.array(fpress), cmap=cm.rainbow, norm=cNorm, edgecolors='k')
+		ax.add_collection(coll)
+		fig.colorbar(coll, ax=ax)
+		plt.plot(xp, yp, 'o')
+		plt.xlim(self.minxlim, self.maxxlim)
+		plt.ylim(self.minylim, self.maxylim)
+		plt.savefig(self.path + "press"+str(self.i).zfill(3)+".png")
+		plt.clf()
+		
+	def createVertexArrayFromTriangulation(self, cs, tri, dic):
 		auxVerts = [[] for _ in xrange(len(tri.x))] #array with number of points
 		for cc, t in zip(tri.circumcenters, tri.triangle_nodes):
 			'''add this circumcenter as a vertex of each of
@@ -158,39 +194,7 @@ class Plotter(object):
 				fstate.append('r')
 			#array with pressure values
 			fpress.append(cs.V[cidx])
-		
-		coll = PolyCollection(vertices, facecolors=fstate, edgecolors='k', alpha = 0.5)
-		
-		fig = plt.figure(figsize=self.figsize)
-		ax = fig.add_subplot(1, 1, 1)
-		ax.add_collection(coll)
-		plt.plot(xp, yp, 'o')
-		plt.xlim(self.minxlim, self.maxxlim)
-		plt.ylim(self.minylim, self.maxylim)
-		plt.savefig(self.path + "vor"+str(self.i).zfill(3)+".png")
-		
-		for e in tri.edge_db:
-			plt.plot(tri.x[e],tri.y[e], color = 'b')
-		for e in ee:
-			ei = np.array(e)
-			plt.plot(xp[ei],yp[ei], color = 'r')
-		plt.xlim(self.minxlim - 0.2, self.maxxlim + 0.2)
-		plt.ylim(self.minylim - 0.2, self.maxylim + 0.2)
-		plt.savefig(self.path + "vorDebug"+str(self.i)+".png")
-		plt.clf()
-		
-		fig = plt.figure(figsize=self.figsize)
-		ax = fig.add_subplot(1, 1, 1)
-		#jet = plt.get_cmap('jet') 
-		cNorm  = colors.Normalize(vmin=0, vmax=0.01)
-		coll = PolyCollection(vertices, array=np.array(fpress), cmap=cm.rainbow, norm=cNorm, edgecolors='k')
-		ax.add_collection(coll)
-		fig.colorbar(coll, ax=ax)
-		plt.plot(xp, yp, 'o')
-		plt.xlim(self.minxlim, self.maxxlim)
-		plt.ylim(self.minylim, self.maxylim)
-		plt.savefig(self.path + "press"+str(self.i).zfill(3)+".png")
-		plt.clf()
+		return vertices, fstate, fpress
 		
 	def mapPointsToPos(self, xp, yp):
 		dic = {}

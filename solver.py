@@ -110,10 +110,7 @@ class Solver(object):
 			nnset = list(cs.nn[j])
 			nnfull[:len(nnset)] = nnset
 			nnarr.append(nnfull)
-			lenNN.append(len(nnset)) #work on this
+			lenNN.append(len(nnset))
 		nnarr = np.array(nnarr, dtype = np.int)
 		lenNN = np.array(lenNN, dtype = np.int)
-		t1 = time.time()
 		run(cs.x, cs.y, cs.vx, cs.vy, cs.fx, cs.fy, nnarr, lenNN, cs.V, cs.fixed, dt, tau, self.k, self.l, self.d0)
-		t2 = time.time()
-		print("Time C = " + str(t2 - t1))
