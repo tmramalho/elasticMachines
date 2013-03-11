@@ -18,7 +18,7 @@ class Plotter(object):
 	'''
 
 
-	def __init__(self, d, path=""):
+	def __init__(self, d, pt, path=""):
 		'''
 		Constructor
 		'''
@@ -38,6 +38,7 @@ class Plotter(object):
 		self.maxxlim = 1.01
 		self.minylim = -0.01
 		self.maxylim = 0.5
+		self.pressThresh = pt*2
 	
 	def setLims(self, maxX, maxY):
 		self.maxxlim = maxX+0.01
@@ -147,15 +148,15 @@ class Plotter(object):
 		for e in ee:
 			ei = np.array(e)
 			plt.plot(xp[ei],yp[ei], color = 'r')
-		plt.xlim(self.minxlim - 0.2, self.maxxlim + 0.2)
-		plt.ylim(self.minylim - 0.2, self.maxylim + 0.2)
+		plt.xlim(1.1*self.minxlim, 1.1*self.maxxlim)
+		plt.ylim(1.1*self.minylim, 1.1*self.maxylim)
 		plt.savefig(self.path + "vorDebug"+str(self.i)+".png")
 		plt.clf()
 		
 		fig = plt.figure(figsize=self.figsize)
 		ax = fig.add_subplot(1, 1, 1)
 		#jet = plt.get_cmap('jet') 
-		cNorm  = None #colors.Normalize(vmin=0, vmax=0.01)
+		cNorm  = colors.Normalize(vmin=0, vmax=self.pressThresh)
 		coll = PolyCollection(vertices, array=np.array(fpress), cmap=cm.rainbow, norm=cNorm, edgecolors='k')
 		ax.add_collection(coll)
 		fig.colorbar(coll, ax=ax)
@@ -236,6 +237,59 @@ class Plotter(object):
 		return edges, opposites
 	
 	def createAuxPoints(self, ee, op, xp, yp):
+		fx = np.copy(xp)
+		fy = np.copy(yp)
+		for e in ee:
+			#index of third point in the triangle
+			#which contains the external edge
+			opi = op[e]
+			dx = xp[e[0]] - xp[e[1]]
+			dy = yp[e[0]] - yp[e[1]]
+			daux = dx*dx+dy*dy
+			dw = np.round(np.sqrt(daux-daux/4),4)
+			if abs(dy) < 1e-8:
+				wn = -1 if yp[opi] > yp[e[0]] else 1
+				xn = xp[e[0]] - dx/2
+				yn = yp[e[0]] + wn * dw
+			elif abs(dx) < 1e-8:
+				wn = -1 if xp[opi] > xp[e[0]] else 1
+				xn = xp[e[0]] + wn * dw
+				yn = yp[e[0]] - dy/2
+			else:
+				rx = dy * 0.7
+				ry = -dx * 0.7
+				
+				ox = xp[opi] - xp[e[0]]
+				oy = yp[opi] - yp[e[0]]
+
+				zxc = (ox+rx)*(ox+rx)+(oy+ry)*(oy+ry)
+				asd = (ox-rx)*(ox-rx)+(oy-ry)*(oy-ry)
+				
+				wn = 1 if zxc < asd else -1
+								
+				xn = (xp[e[0]] - dx/2) + wn * rx
+				yn = (yp[e[0]] - dy/2) + wn * ry
+				
+			fx = np.append(fx, xn)
+			fy = np.append(fy, yn)
+		#maxs
+		bottom = np.min(fy)
+		top = np.max(fy)
+		left = np.min(fx)
+		right = np.max(fx)
+		#fix bottom corners
+		fx = np.append(fx, left)
+		fy = np.append(fy, bottom)
+		fx = np.append(fx, right)
+		fy = np.append(fy, bottom)
+		#fix top corners
+		fx = np.append(fx, left)
+		fy = np.append(fy, top)
+		fx = np.append(fx, right)
+		fy = np.append(fy, top)
+		return fx,fy
+	
+	def createAuxPointsBak(self, ee, op, xp, yp):
 		fx = np.copy(xp)
 		fy = np.copy(yp)
 		for e in ee:

@@ -5,7 +5,6 @@ Created on Feb 7, 2013
 '''
 
 import math
-import time
 import numpy as np
 from csolver import run
 
@@ -106,7 +105,7 @@ class Solver(object):
 		lenNN = []
 		#pack the cell objects onto ndarrays
 		for j in xrange(cs.size):
-			nnfull = np.zeros(10, dtype = np.int)
+			nnfull = np.zeros(12, dtype = np.int)
 			nnset = list(cs.nn[j])
 			nnfull[:len(nnset)] = nnset
 			nnarr.append(nnfull)

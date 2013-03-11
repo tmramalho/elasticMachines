@@ -30,8 +30,8 @@ class CellSystem():
 		self.fx = np.zeros((numCells, 5), dtype=float)
 		self.fy = np.zeros((numCells, 5), dtype=float)
 		self.nn = [set() for _ in xrange(numCells)]
-		self.state = np.zeros(numCells, dtype=float)
-		self.newState = np.zeros(numCells, dtype=float)
+		self.state = np.zeros(numCells, dtype=int)
+		self.newState = np.zeros(numCells, dtype=int)
 		self.fixed = np.array(fixed, dtype=int)
 		self.V = np.zeros(numCells, dtype=float)
 		self.size = self.x.shape[0]
@@ -50,26 +50,30 @@ class CellSystem():
 		self.V = np.concatenate([self.V, [0]])
 		self.size = self.x.shape[0]
 		
-	def deleteCell(self, j):
-		self.x = np.delete(self.x, j, axis=0)
-		self.y = np.delete(self.y, j, axis=0)
-		self.vx = np.delete(self.vx, j, axis=0)
-		self.vy = np.delete(self.vy, j, axis=0)
-		self.fx = np.delete(self.fx, j, axis=0)
-		self.fy = np.delete(self.fy, j, axis=0)
-		self.state = np.delete(self.state, j, axis=0)
-		self.newState = np.delete(self.newState, j, axis=0)
-		self.fixed = np.delete(self.fixed, j, axis=0)
-		self.V = np.delete(self.V, j, axis=0)
-		self.nn.pop(j)
+	def deleteCells(self, targets):
+		self.x = np.delete(self.x, targets, axis=0)
+		self.y = np.delete(self.y, targets, axis=0)
+		self.vx = np.delete(self.vx, targets, axis=0)
+		self.vy = np.delete(self.vy, targets, axis=0)
+		self.fx = np.delete(self.fx, targets, axis=0)
+		self.fy = np.delete(self.fy, targets, axis=0)
+		self.state = np.delete(self.state, targets, axis=0)
+		self.newState = np.delete(self.newState, targets, axis=0)
+		self.fixed = np.delete(self.fixed, targets, axis=0)
+		self.V = np.delete(self.V, targets, axis=0)
+		for t in sorted(targets, reverse=True):
+			self.nn.pop(t)
 		self.size = self.x.shape[0]
 		
-	def deleteRogueCells(self):
+	def deleteRogueCells(self, maxY):
 		numCells = self.x.shape[0]
+		goners = set()
 		for j in xrange(numCells):
-			if self.x[j, 3] < 0 or self.x[j, 3] > 1 or self.y[j, 3] < 0:
-				self.deleteCell(j)
+			if self.x[j, 3] < 0 or self.x[j, 3] > 1 or self.y[j, 3] < 0 or self.y[j, 3] > maxY:
+				goners.add(j)
+		self.deleteCells(list(goners))
 		self.size = self.x.shape[0]
+		return len(goners)
 		
 	def updatePositions(self):
 		self.x = np.roll(self.x, -1, axis=1)

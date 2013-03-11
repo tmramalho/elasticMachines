@@ -101,3 +101,12 @@ def run(
 				vyarr[j, n] = vyarr[j, n+1]
 				fxarr[j, n] = fxarr[j, n+1]
 				fyarr[j, n] = fyarr[j, n+1]
+				
+				
+@cython.boundscheck(False)
+@cython.cdivision(True)
+@cython.wraparound(False)
+def dist(int[:] e, np.ndarray[FLDT_t, ndim=1] xp not None, np.ndarray[FLDT_t, ndim=1] yp not None):
+	cdef double dx = xp[e[0]] - xp[e[1]]
+	cdef double dy = yp[e[0]] - yp[e[1]]
+	return sqrt(dx*dx+dy*dy)
