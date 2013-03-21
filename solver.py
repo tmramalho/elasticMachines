@@ -29,7 +29,7 @@ class Solver(object):
 		as the initial condition
 		'''
 		for j in xrange(cs.size):
-			cs.fx[j, 0], cs.fy[j, 0] = self.calcAcc(cs, j, 0)
+			cs.fx[j, 0], cs.fy[j, 0] = self.calcApproxAcc(cs, j)
 		for i in xrange(1, 4):
 			for j in xrange(cs.size):
 				if cs.fixed[j]:
@@ -47,12 +47,18 @@ class Solver(object):
 		'''
 		j = cs.size - 1
 		cs.fx[j, 3], cs.fy[j, 3] = self.calcAcc(cs, j, 3)
-		for i in [2, 1, 0]:
+		for i in [2, 1]:
 			cs.vx[j, i] = cs.vx[j, i+1] - dt*cs.fx[j, i+1]
 			cs.vy[j, i] = cs.vy[j, i+1] - dt*cs.fx[j, i+1]
 			cs.x[j, i] = cs.x[j, i+1] - dt*cs.vx[j, i+1]
 			cs.y[j, i] = cs.y[j, i+1] - dt*cs.vy[j, i+1]
 			cs.fx[j, i], cs.fy[j, i] = self.calcAcc(cs, j, i)
+		
+		cs.vx[j, 0] = cs.vx[j, 1] - dt*cs.fx[j, 1]
+		cs.vy[j, 0] = cs.vy[j, 1] - dt*cs.fx[j, 1]
+		cs.x[j, 0] = cs.x[j, 1] - dt*cs.vx[j, 1]
+		cs.y[j, 0] = cs.y[j, 1] - dt*cs.vy[j, 1]
+		cs.fx[j, 0], cs.fy[j, 0] = self.calcApproxAcc(cs, j)
 		
 	def run(self, cs, dt, total):
 		'''
@@ -87,8 +93,8 @@ class Solver(object):
 		accy = 0
 		vacc = 0
 		for pn in cs.nn[j]:
-			xj = cs.x[pn, n]
-			yj = cs.y[pn, n]
+			xj = cs.x[pn, n-1]
+			yj = cs.y[pn, n-1]
 			dx = xi - xj
 			dy = yi - yj
 			d = math.sqrt(dx*dx + dy*dy)
@@ -97,6 +103,26 @@ class Solver(object):
 			vacc += 0.5*self.k*math.pow(d - self.d0, 2)
 		accx -= self.l*cs.vx[j, n]
 		accy -= self.l*cs.vy[j, n]
+		cs.V[j] = vacc
+		return accx, accy
+	
+	def calcApproxAcc(self, cs, j):
+		xi = cs.x[j, 0]
+		yi = cs.y[j, 0]
+		accx = 0
+		accy = 0
+		vacc = 0
+		for pn in cs.nn[j]:
+			xj = cs.x[pn, 0]
+			yj = cs.y[pn, 0]
+			dx = xi - xj
+			dy = yi - yj
+			d = math.sqrt(dx*dx + dy*dy)
+			accx += - self.k*dx*(1-self.d0/d)
+			accy += - self.k*dy*(1-self.d0/d)
+			vacc += 0.5*self.k*math.pow(d - self.d0, 2)
+		accx -= self.l*cs.vx[j, 0]
+		accy -= self.l*cs.vy[j, 0]
 		cs.V[j] = vacc
 		return accx, accy
 	

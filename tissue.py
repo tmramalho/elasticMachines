@@ -5,50 +5,52 @@ Created on Feb 6, 2013
 '''
 
 import matplotlib.delaunay.triangulate as triang
-from plotter import Plotter
 import numpy as np
 from solver import Solver
 from automaton import Automaton
 import time
+import os
 from cellSystem import CellSystem
 import math
 from csolver import dist
+import cPickle as cp
 
 class Tissue(object):
 	'''
 	Main simulation loop manager
 	'''
 
-
-	def __init__(self, k, l, d, nx, ny, plot=False):
+	def __init__(self, k, l, d, nx, ny, ns = 10):
 		'''
 		Constructor
 		'''
 		self.nx = nx
 		self.ny = ny
 		self.pt = 0.5*k*math.pow(0.5*d,2)
-		self.plotter = Plotter(d, self.pt)
 		self.solver = Solver(k, l, d)
 		self.md = 2*d
 		self.hd = d/2
 		self.ca = Automaton(self.pt)
 		self.dt = 0.01
-		self.plotAllSteps = plot
 		self.numNewCells = 0
 		self.numDead = 0
+		self.avEquilib = 0
+		self.avSize = 0
+		self.numSteps = ns
+		self.nIters = 0
+		self.uniqueRunString = 'data/em'+str(os.getpid())+str(int(time.time()))
 		
 	def setupDevelopment(self, maxX, maxY):
-		self.plotter.setLims(maxX, maxY)
+		self.mx = maxX
 		self.my = maxY*4
-		print "end:", self.my
 		cellsX = []
 		cellsY = []
 		fixed = []
 		self.cs = CellSystem()
 		for x in xrange(self.nx):
 			for y in xrange(self.ny):
-				xPos = x/(self.nx-1.0)*maxX
-				yPos = y/(self.ny-1.0)*maxY
+				xPos = x/(self.nx-1.0)*maxX + np.random.rand(1)*0.00001
+				yPos = y/(self.ny-1.0)*maxY + np.random.rand(1)*0.00001
 				#or y == self.ny-1
 				if(x == 0 or y == 0 or x == self.nx-1):
 					fixed.append(True)
@@ -62,23 +64,21 @@ class Tissue(object):
 		self.numNewCells = self.nx*self.ny
 		self.calcDelaunay()
 		self.solver.runInit(self.cs, 0.01)
-		self.cs.state[140] = 1
-		self.plotter.plotCellStates(self.cs, self.xp, self.yp, self.edges, self.tt.circumcenters, self.tt.triangle_nodes)
-		self.plotter.next()
 		
 	def run(self):
 		t1 = time.time()
-		for _ in range(50):
+		for n in range(self.numSteps):
+			print n
+			'''
+			Step 1: reach elastic equilibrium
+			'''
 			if self.numNewCells > 0 or self.numDead > 0:
 				self.equilibrate()
 			
-			if self.plotAllSteps:
-				'''
-				Step 2: plot stuff
-				'''
-				self.plotter.plotCellStates(self.cs, self.xp, self.yp, self.edges, self.tt.circumcenters, self.tt.triangle_nodes)
-				self.plotter.drawCells(self.cs, self.tt.triangle_nodes, self.xp, self.yp)
-				self.plotter.next()
+			'''
+			Step 2: save current system state
+			'''
+			self.saveCellState(n)
 			
 			'''
 			Step 3: update state and add cells
@@ -99,9 +99,8 @@ class Tissue(object):
 		self.equilibrate()	
 		t2 = time.time()
 		print("Time 1a = " + str(t2 - t1))
-		self.plotter.plotCellStates(self.cs, self.xp, self.yp, self.edges, self.tt.circumcenters, self.tt.triangle_nodes)
-		self.plotter.drawCells(self.cs, self.tt.triangle_nodes, self.xp, self.yp)
-		self.plotter.next()
+		self.saveCellState(self.numSteps)
+		self.saveParameters()
 		
 	def equilibrate(self):
 		i = 0
@@ -115,6 +114,9 @@ class Tissue(object):
 				break
 			i += 1
 		print "equilib:", i, self.cs.size
+		self.avEquilib += i
+		self.avSize += self.cs.size
+		self.nIters += 1
 		
 	def calcDelaunay(self):
 		#delaunay
@@ -133,4 +135,26 @@ class Tissue(object):
 			r = self.hd*(np.random.rand(2) - 0.5)
 			self.cs.addCell(nc[0]+r[0], nc[1]+r[1], False)
 			self.solver.initNewCell(self.cs, self.dt)
+			
+	def saveParameters(self):
+		with open(self.uniqueRunString+'.txt', 'w') as f:
+			f.write("Run finished at: " + time.strftime("%d %b %Y %H:%M:%S") + "\n")
+			f.write("Automaton rule: " + str(self.ca.getRuleID()) + "\n")
+			f.write("init num cells x: " + str(self.nx) + "\n")
+			f.write("init num cells y: " + str(self.ny) + "\n")
+			f.write("pressure threshold: " + str(self.pt) + "\n")
+			f.write("lambda: "  + str(self.solver.l) + "\n")
+			f.write("stiffness: "  + str(self.solver.k) + "\n")
+			f.write("rest length: "  + str(self.solver.d0) + "\n")
+			f.write("dt: " + str(self.dt) + "\n")
+			f.write("number of ca steps: " + str(self.numSteps) + "\n")
+			f.write("max x: " + str(self.mx) + "\n")
+			f.write("max y: " + str(self.my) + "\n")
+			f.write("average equilibration time: " + str(self.avEquilib/float(self.nIters)) + "\n")
+			f.write("average system size: " + str(self.avSize/float(self.nIters)) + "\n")
+			f.write("final system size: " + str(self.cs.size) + "\n")
+			
+	def saveCellState(self, n):
+		with open(self.uniqueRunString+str(n).zfill(4)+'.txt', 'wb') as f:
+			cp.dump(self.cs, f, protocol=-1)
 	

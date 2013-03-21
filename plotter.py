@@ -34,15 +34,15 @@ class Plotter(object):
 		self.dh = d/2
 		self.md = d*2
 		self.figsize = (8/(10*d),6)
-		self.minxlim = -0.01
-		self.maxxlim = 1.01
-		self.minylim = -0.01
-		self.maxylim = 0.5
-		self.pressThresh = pt*2
+		self.minxlim = -0.001
+		self.maxxlim = 1.001
+		self.minylim = -0.001
+		self.maxylim = 0.501
+		self.pressThresh = pt
 	
 	def setLims(self, maxX, maxY):
-		self.maxxlim = maxX+0.01
-		self.maxylim = 3*maxY+0.01
+		self.maxxlim = maxX+0.001
+		self.maxylim = maxY+0.001
 		
 	def plotDelaunay(self, xp, yp, triangles):
 		for t in triangles:
@@ -97,25 +97,20 @@ class Plotter(object):
 		ax = fig.add_subplot(1, 1, 1)
 		#xp, yp is same as c.x, c.y
 		for i in xrange(cs.size):
-			if cs.state[i] == 1:
+			ptest = cs.V[i] < self.pressThresh
+			if cs.state[i] == 1 and ptest:
 				co = 'g'
+			elif cs.state[i] == 1:
+				co = 'y'
+			elif ptest:
+				co = 'b'
 			else:
 				co = 'r'
 			circle = plt.Circle((cs.x[i, 3], cs.y[i, 3]), radius=self.dh, color=co, alpha = 0.5)
 			ax.add_patch(circle)
-			ax.text(cs.x[i, 3]+0.01, cs.y[i, 3]+0.01, str(i))
+			ax.text(cs.x[i, 3], cs.y[i, 3], str(i))
+			ax.text(cs.x[i, 3], cs.y[i, 3]-0.002, "%.2e" % cs.V[i], fontsize=9, color='m')
 			
-#		for i in xrange(len(neighbors)):
-#			j = neighbors[i][0]
-#			k = neighbors[i][1]
-#			l = neighbors[i][2]
-#			if j > -1:
-#				plt.plot([circumcenters[i][0], circumcenters[j][0]], [circumcenters[i][1], circumcenters[j][1]], color='k')
-#			if k > -1:
-#				plt.plot([circumcenters[i][0], circumcenters[k][0]], [circumcenters[i][1], circumcenters[k][1]], color='k')
-#			if l > -1:
-#				plt.plot([circumcenters[i][0], circumcenters[l][0]], [circumcenters[i][1], circumcenters[l][1]], color='k')
-		
 		for e in edges:
 			plt.plot(xp[e],yp[e], color = 'b')
 			
@@ -127,7 +122,6 @@ class Plotter(object):
 		
 	def drawCells(self, cs, triangles, xp, yp):
 		dic = self.mapPointsToPos(xp, yp)
-		#fx, fy = self.createFakePoints(xp, yp)
 		ee, op = self.findExternalEdges(triangles, xp, yp)
 		fx, fy = self.createAuxPoints(ee, op, xp, yp)
 		tri = triang.Triangulation(fx,fy)
@@ -153,10 +147,25 @@ class Plotter(object):
 		plt.savefig(self.path + "vorDebug"+str(self.i)+".png")
 		plt.clf()
 		
+		pcols = []
+		for fp in fpress:
+			if fp < self.pressThresh:
+				pcols.append('b')
+			else:
+				pcols.append('c')
+		coll = PolyCollection(vertices, facecolors=pcols, edgecolors='k', alpha = 0.5)
+		fig = plt.figure(figsize=self.figsize)
+		ax = fig.add_subplot(1, 1, 1)
+		ax.add_collection(coll)
+		plt.plot(xp, yp, 'o')
+		plt.xlim(self.minxlim, self.maxxlim)
+		plt.ylim(self.minylim, self.maxylim)
+		plt.savefig(self.path + "pstate"+str(self.i).zfill(3)+".png")
+		
 		fig = plt.figure(figsize=self.figsize)
 		ax = fig.add_subplot(1, 1, 1)
 		#jet = plt.get_cmap('jet') 
-		cNorm  = colors.Normalize(vmin=0, vmax=self.pressThresh)
+		cNorm  = colors.Normalize(vmin=0, vmax=self.pressThresh*2)
 		coll = PolyCollection(vertices, array=np.array(fpress), cmap=cm.rainbow, norm=cNorm, edgecolors='k')
 		ax.add_collection(coll)
 		fig.colorbar(coll, ax=ax)

@@ -66,10 +66,15 @@ class CellSystem():
 		self.size = self.x.shape[0]
 		
 	def deleteRogueCells(self, maxY):
+		tol = 0.001
+		bx = 0 - tol
+		tx = 1 + tol
+		by = 0 - tol
+		ty = maxY + tol
 		numCells = self.x.shape[0]
 		goners = set()
 		for j in xrange(numCells):
-			if self.x[j, 3] < 0 or self.x[j, 3] > 1 or self.y[j, 3] < 0 or self.y[j, 3] > maxY:
+			if self.x[j, 3] < bx or self.x[j, 3] > tx or self.y[j, 3] < by or self.y[j, 3] > ty:
 				goners.add(j)
 		self.deleteCells(list(goners))
 		self.size = self.x.shape[0]

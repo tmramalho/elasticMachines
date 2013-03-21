@@ -40,7 +40,6 @@ def run(
 		for j in range(nCells):
 			if fiarr[j] == 1:
 				continue
-			test = vxarr[j, 3]/2
 			vxarr[j, 4] = vxarr[j, 3] + dt*(55*fxarr[j, 3] - 59*fxarr[j, 2] + 37*fxarr[j, 1] - 9*fxarr[j, 0])/24
 			vyarr[j, 4] = vyarr[j, 3] + dt*(55*fyarr[j, 3] - 59*fyarr[j, 2] + 37*fyarr[j, 1] - 9*fyarr[j, 0])/24
 			xarr[j, 4]  = xarr[j, 3]  + dt*(55*vxarr[j, 3] - 59*vxarr[j, 2] + 37*vxarr[j, 1] - 9*vxarr[j, 0])/24
@@ -50,18 +49,15 @@ def run(
 			acc[1] = 0
 			xi = xarr[j, 4]
 			yi = yarr[j, 4]
-			vacc = 0
 			for n in range(lenNN[j]):
 				pn = nnarr[j, n]
-				xn = xarr[pn, 4]
-				yn = yarr[pn, 4]
+				xn = xarr[pn, 3]
+				yn = yarr[pn, 3]
 				dx = xi - xn
 				dy = yi - yn
 				d = sqrt(dx*dx + dy*dy)
 				acc[0] -= k*dx*(1-d0/d)
 				acc[1] -= k*dy*(1-d0/d)
-				vacc += 0.5*k*pow(d - d0, 2)
-			varr[j] = vacc
 			acc[0] -= l*vxarr[j, 4]
 			acc[1] -= l*vyarr[j, 4]
 			fxarr[j, 4] = acc[0]
@@ -76,18 +72,15 @@ def run(
 			acc[1] = 0
 			xi = xarr[j, 4]
 			yi = yarr[j, 4]
-			vacc = 0
 			for n in range(lenNN[j]):
 				pn = nnarr[j, n]
-				xn = xarr[pn, 4]
-				yn = yarr[pn, 4]
+				xn = xarr[pn, 3]
+				yn = yarr[pn, 3]
 				dx = xi - xn
 				dy = yi - yn
 				d = sqrt(dx*dx + dy*dy)
 				acc[0] -= k*dx*(1-d0/d)
 				acc[1] -= k*dy*(1-d0/d)
-				vacc += 0.5*k*pow(d - d0, 2)
-			varr[j] = vacc
 			acc[0] -= l*vxarr[j, 4]
 			acc[1] -= l*vyarr[j, 4]
 			fxarr[j, 4] = acc[0]
@@ -101,6 +94,19 @@ def run(
 				vyarr[j, n] = vyarr[j, n+1]
 				fxarr[j, n] = fxarr[j, n+1]
 				fyarr[j, n] = fyarr[j, n+1]
+		for j in range(nCells):
+			vacc = 0
+			xi = xarr[j, 3]
+			yi = yarr[j, 3]
+			for n in range(lenNN[j]):
+				pn = nnarr[j, n]
+				xn = xarr[pn, 3]
+				yn = yarr[pn, 3]
+				dx = xi - xn
+				dy = yi - yn
+				d = sqrt(dx*dx + dy*dy)
+				vacc += 0.5*k*(d - d0)*(d - d0)
+			varr[j] = vacc
 				
 				
 @cython.boundscheck(False)
