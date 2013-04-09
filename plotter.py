@@ -11,6 +11,7 @@ import matplotlib.colors as colors
 import matplotlib.delaunay.triangulate as triang
 import os
 import itertools
+from csolver import dist
 
 class Plotter(object):
 	'''
@@ -40,140 +41,127 @@ class Plotter(object):
 		self.maxylim = 0.501
 		self.pressThresh = pt
 	
+	def calcDelaunay(self, cs):
+		#delaunay
+		self.xp = np.copy(cs.x[:,3])
+		self.yp = np.copy(cs.y[:,3])
+		self.tt = triang.Triangulation(self.xp,self.yp)
+		self.edges = [e for e in self.tt.edge_db if dist(e,self.xp,self.yp) < self.md]
+		self.numEdges = len(self.edges)
+	
 	def setLims(self, maxX, maxY):
 		self.maxxlim = maxX+0.001
 		self.maxylim = maxY+0.001
 		
-	def plotDelaunay(self, xp, yp, triangles):
-		for t in triangles:
+	def plotDelaunay(self):
+		plt.clf()
+		plt.figure(figsize=self.figsize)
+		for t in self.tt.triangle_nodes:
 			# t[0], t[1], t[2] are the points indexes of the triangle
 			t_i = [t[0], t[1], t[2], t[0]]
-			plt.plot(xp[t_i],yp[t_i])
+			plt.plot(self.xp[t_i],self.yp[t_i])
 
-		plt.plot(xp,yp,'o')
+		plt.plot(self.xp,self.yp,'o')
 		plt.xlim(self.minxlim, self.maxxlim)
 		plt.ylim(self.minylim, self.maxylim)
-		#plt.draw()
 		plt.savefig(self.path + "step"+str(self.i)+".png")
-		plt.clf()
 		
 	def next(self):
 		self.i += 1
-	
-	def plotVoronoi(self, cs, xp, yp, edges, circumcenters, neighbors, triangles):
-		fig = plt.figure(figsize=self.figsize)
-		ax = fig.add_subplot(1, 1, 1)
-		vertices = [[] for _ in xrange(len(xp))] #array with number of points
-		for cc, t in zip(circumcenters, triangles):
-			'''add this circumcenter as a vertex of each of
-			the points which make up the triangle'''
-			vertices[t[0]].append(cc)
-			vertices[t[1]].append(cc)
-			vertices[t[2]].append(cc)
-		for i,v in enumerate(vertices):
-			v = np.array(v)
-			idx = self.ccworder(v.T)
-			v = v[idx]
-			vertices[i] = v
-		fc = []
-		for i in xrange(cs.size):
-			if cs.state[i] == 1:
-				fc.append('g')
-			else:
-				fc.append('r')
-		coll = PolyCollection(vertices, facecolors=fc, edgecolors='k', alpha = 0.5)
-		ax.add_collection(coll)
-		plt.xlim(self.minxlim, self.maxxlim)
-		plt.ylim(self.minylim, self.maxylim)
-		plt.savefig(self.path + "vor"+str(self.i).zfill(3)+".png")
-		plt.clf()
+		
+	def setupCellSystem(self, cs):
+		self.calcDelaunay(cs)
+		self.cs = cs
+		dic = self.mapPointsToPos(self.xp, self.yp)
+		self.extedges, op = self.findExternalEdges(self.tt.triangle_nodes, self.xp, self.yp)
+		fx, fy = self.createAuxPoints(self.extedges, op, self.xp, self.yp)
+		self.tri = triang.Triangulation(fx,fy)
+		self.vertices, self.fstate, self.fpress = self.createVertexArrayFromTriangulation(self.cs, self.tri, dic)
 	
 	def ccworder(self, A):
 		A= A- np.mean(A, 1)[:, None]
 		return np.argsort(np.arctan2(A[1, :], A[0, :]))
 		
-	def plotCellStates(self, cs, xp, yp, edges, circumcenters, neighbors):
+	def plotCellSystem(self):
+		plt.clf()
 		fig = plt.figure(figsize=self.figsize)
 		ax = fig.add_subplot(1, 1, 1)
 		#xp, yp is same as c.x, c.y
-		for i in xrange(cs.size):
-			ptest = cs.V[i] < self.pressThresh
-			if cs.state[i] == 1 and ptest:
+		for i in xrange(self.cs.size):
+			ptest = self.cs.V[i] < self.pressThresh
+			if self.cs.state[i] == 1 and ptest:
 				co = 'g'
-			elif cs.state[i] == 1:
+			elif self.cs.state[i] == 1:
 				co = 'y'
 			elif ptest:
 				co = 'b'
 			else:
 				co = 'r'
-			circle = plt.Circle((cs.x[i, 3], cs.y[i, 3]), radius=self.dh, color=co, alpha = 0.5)
+			circle = plt.Circle((self.xp[i], self.yp[i]), radius=self.dh, color=co, alpha = 0.5)
 			ax.add_patch(circle)
-			ax.text(cs.x[i, 3], cs.y[i, 3], str(i))
-			ax.text(cs.x[i, 3], cs.y[i, 3]-0.002, "%.2e" % cs.V[i], fontsize=9, color='m')
+			ax.text(self.xp[i], self.yp[i], str(i))
+			ax.text(self.xp[i], self.yp[i]-0.002, "%.2e" % self.cs.V[i], fontsize=9, color='m')
 			
-		for e in edges:
-			plt.plot(xp[e],yp[e], color = 'b')
+		for e in self.edges:
+			plt.plot(self.xp[e],self.yp[e], color = 'b')
 			
-		plt.plot(xp,yp,'o')
+		plt.plot(self.xp,self.yp,'o')
 		plt.xlim(self.minxlim, self.maxxlim)
 		plt.ylim(self.minylim, self.maxylim)
-		plt.savefig(self.path + "state"+str(self.i).zfill(3)+".png")
+		plt.savefig(self.path + "system"+str(self.i).zfill(3)+".png")
+		
+	def drawCellStates(self, debug=False):
 		plt.clf()
-		
-	def drawCells(self, cs, triangles, xp, yp):
-		dic = self.mapPointsToPos(xp, yp)
-		ee, op = self.findExternalEdges(triangles, xp, yp)
-		fx, fy = self.createAuxPoints(ee, op, xp, yp)
-		tri = triang.Triangulation(fx,fy)
-		vertices, fstate, fpress = self.createVertexArrayFromTriangulation(cs, tri, dic)
-		
-		coll = PolyCollection(vertices, facecolors=fstate, edgecolors='k', alpha = 0.5)
+		coll = PolyCollection(self.vertices, facecolors=self.fstate, edgecolors='k', alpha = 0.5)
 		
 		fig = plt.figure(figsize=self.figsize)
 		ax = fig.add_subplot(1, 1, 1)
 		ax.add_collection(coll)
-		plt.plot(xp, yp, 'o')
+		plt.plot(self.xp, self.yp, 'o')
 		plt.xlim(self.minxlim, self.maxxlim)
 		plt.ylim(self.minylim, self.maxylim)
-		plt.savefig(self.path + "vor"+str(self.i).zfill(3)+".png")
+		plt.savefig(self.path + "state"+str(self.i).zfill(3)+".png")
 		
-		for e in tri.edge_db:
-			plt.plot(tri.x[e],tri.y[e], color = 'b')
-		for e in ee:
-			ei = np.array(e)
-			plt.plot(xp[ei],yp[ei], color = 'r')
-		plt.xlim(1.1*self.minxlim, 1.1*self.maxxlim)
-		plt.ylim(1.1*self.minylim, 1.1*self.maxylim)
-		plt.savefig(self.path + "vorDebug"+str(self.i)+".png")
+		if debug:
+			for e in self.tri.edge_db:
+				plt.plot(self.tri.x[e],self.tri.y[e], color = 'b')
+			for e in self.extedges:
+				ei = np.array(e)
+				plt.plot(self.xp[ei],self.yp[ei], color = 'r')
+			plt.xlim(1.1*self.minxlim, 1.1*self.maxxlim)
+			plt.ylim(1.1*self.minylim, 1.1*self.maxylim)
+			plt.savefig(self.path + "vorDebug"+str(self.i)+".png")
+		
+	def drawCellPressure(self):
 		plt.clf()
-		
 		pcols = []
-		for fp in fpress:
+		for fp in self.fpress:
 			if fp < self.pressThresh:
 				pcols.append('b')
 			else:
 				pcols.append('c')
-		coll = PolyCollection(vertices, facecolors=pcols, edgecolors='k', alpha = 0.5)
+		coll = PolyCollection(self.vertices, facecolors=pcols, edgecolors='k', alpha = 0.5)
 		fig = plt.figure(figsize=self.figsize)
 		ax = fig.add_subplot(1, 1, 1)
 		ax.add_collection(coll)
-		plt.plot(xp, yp, 'o')
+		plt.plot(self.xp, self.yp, 'o')
 		plt.xlim(self.minxlim, self.maxxlim)
 		plt.ylim(self.minylim, self.maxylim)
 		plt.savefig(self.path + "pstate"+str(self.i).zfill(3)+".png")
 		
+	def drawPressureValues(self):
+		plt.clf()
 		fig = plt.figure(figsize=self.figsize)
 		ax = fig.add_subplot(1, 1, 1)
 		#jet = plt.get_cmap('jet') 
 		cNorm  = colors.Normalize(vmin=0, vmax=self.pressThresh*2)
-		coll = PolyCollection(vertices, array=np.array(fpress), cmap=cm.rainbow, norm=cNorm, edgecolors='k')
+		coll = PolyCollection(self.vertices, array=np.array(self.fpress), cmap=cm.rainbow, norm=cNorm, edgecolors='k')
 		ax.add_collection(coll)
 		fig.colorbar(coll, ax=ax)
-		plt.plot(xp, yp, 'o')
+		plt.plot(self.xp, self.yp, 'o')
 		plt.xlim(self.minxlim, self.maxxlim)
 		plt.ylim(self.minylim, self.maxylim)
 		plt.savefig(self.path + "press"+str(self.i).zfill(3)+".png")
-		plt.clf()
 		
 	def createVertexArrayFromTriangulation(self, cs, tri, dic):
 		auxVerts = [[] for _ in xrange(len(tri.x))] #array with number of points
@@ -246,6 +234,9 @@ class Plotter(object):
 		return edges, opposites
 	
 	def createAuxPoints(self, ee, op, xp, yp):
+		'''
+		This method by Miguel Miranda 2013
+		'''
 		fx = np.copy(xp)
 		fy = np.copy(yp)
 		for e in ee:
@@ -298,65 +289,3 @@ class Plotter(object):
 		fy = np.append(fy, top)
 		return fx,fy
 	
-	def createAuxPointsBak(self, ee, op, xp, yp):
-		fx = np.copy(xp)
-		fy = np.copy(yp)
-		for e in ee:
-			#index of third point in the triangle
-			#which contains the external edge
-			opi = op[e]
-			dx = xp[e[0]] - xp[e[1]]
-			dy = yp[e[0]] - yp[e[1]]
-			if abs(dy) < 1e-8:
-				xn = xp[opi]
-				yn = 2*yp[e[0]] - yp[opi]
-			elif abs(dx) < 1e-8:
-				xn = 2*xp[e[0]] - xp[opi]
-				yn = yp[opi]
-			else:
-				#y = ax + b defines the external edge
-				a = dy/dx
-				b = yp[e[1]] - xp[e[1]]*a
-				#reflect third point along external edge
-				d = (xp[opi] + (yp[opi] - b)*a)/(1 + a*a)
-				xn = 2*d - xp[opi]
-				yn = 2*d*a - yp[opi] + 2*b
-			fx = np.append(fx, xn)
-			fy = np.append(fy, yn)
-		#fix bottom corners
-		fx = np.append(fx, -self.dh)
-		fy = np.append(fy, -self.dh)
-		fx = np.append(fx, 1+self.dh)
-		fy = np.append(fy, -self.dh)
-		#fix top corners
-		top = np.max(yp)
-		fx = np.append(fx, -self.dh)
-		fy = np.append(fy, top+self.dh)
-		fx = np.append(fx, 1+self.dh)
-		fy = np.append(fy, top+self.dh)
-		return fx,fy
-		
-	def createFakePoints(self, xp, yp):
-		self.xmax = np.max(xp)
-		self.xmin = np.min(xp)
-		self.ymax = np.max(yp)
-		self.ymin = np.min(yp)
-		right = self.xmax + self.d
-		left = self.xmin - self.d
-		top = self.ymax + self.d
-		bottom = self.ymin - self.d
-		xran = np.concatenate((np.arange(left,right,self.d), [right]))
-		yran = np.concatenate((np.arange(bottom,top,self.d), [top]))
-		#right
-		fx = np.append(xp, xran)
-		fy = np.append(yp, np.ones(len(xran))*top)
-		#bottom
-		fx = np.append(fx, xran)
-		fy = np.append(fy, np.ones(len(xran))*bottom)
-		#left
-		fx = np.append(fx, np.ones(len(yran))*left)
-		fy = np.append(fy, yran)
-		#right
-		fx = np.append(fx, np.ones(len(yran))*right)
-		fy = np.append(fy, yran)
-		return fx, fy

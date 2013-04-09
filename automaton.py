@@ -43,7 +43,6 @@ class Automaton(object):
 	
 	def setRuleID(self, rid):
 		bits = np.binary_repr(rid, width=16)[::-1]
-		print bits
 		for i in xrange(8):
 			self.transition[i] = bits[i]
 			self.growth[i] = bits[i+8]

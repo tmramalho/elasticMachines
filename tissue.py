@@ -20,7 +20,7 @@ class Tissue(object):
 	Main simulation loop manager
 	'''
 
-	def __init__(self, k, l, d, nx, ny, ns = 10):
+	def __init__(self, k, l, d, nx, ny, ns, ruleID):
 		'''
 		Constructor
 		'''
@@ -31,6 +31,7 @@ class Tissue(object):
 		self.md = 2*d
 		self.hd = d/2
 		self.ca = Automaton(self.pt)
+		self.ca.setRuleID(ruleID)
 		self.dt = 0.01
 		self.numNewCells = 0
 		self.numDead = 0
@@ -38,7 +39,8 @@ class Tissue(object):
 		self.avSize = 0
 		self.numSteps = ns
 		self.nIters = 0
-		self.uniqueRunString = 'data/em'+str(os.getpid())+str(int(time.time()))
+		self.dataFolder = os.getcwd() + '/data/em'+str(os.getpid())+str(int(time.time()))+str(ruleID) + "/"
+		os.mkdir(self.dataFolder)
 		
 	def setupDevelopment(self, maxX, maxY):
 		self.mx = maxX
@@ -68,7 +70,6 @@ class Tissue(object):
 	def run(self):
 		t1 = time.time()
 		for n in range(self.numSteps):
-			print n
 			'''
 			Step 1: reach elastic equilibrium
 			'''
@@ -98,7 +99,7 @@ class Tissue(object):
 		
 		self.equilibrate()	
 		t2 = time.time()
-		print("Time 1a = " + str(t2 - t1))
+		self.rt = str(t2 - t1)
 		self.saveCellState(self.numSteps)
 		self.saveParameters()
 		
@@ -137,7 +138,7 @@ class Tissue(object):
 			self.solver.initNewCell(self.cs, self.dt)
 			
 	def saveParameters(self):
-		with open(self.uniqueRunString+'.txt', 'w') as f:
+		with open(self.dataFolder+'params.txt', 'w') as f:
 			f.write("Run finished at: " + time.strftime("%d %b %Y %H:%M:%S") + "\n")
 			f.write("Automaton rule: " + str(self.ca.getRuleID()) + "\n")
 			f.write("init num cells x: " + str(self.nx) + "\n")
@@ -153,8 +154,9 @@ class Tissue(object):
 			f.write("average equilibration time: " + str(self.avEquilib/float(self.nIters)) + "\n")
 			f.write("average system size: " + str(self.avSize/float(self.nIters)) + "\n")
 			f.write("final system size: " + str(self.cs.size) + "\n")
+			f.write("runtime in seconds: " + self.rt + "\n")
 			
 	def saveCellState(self, n):
-		with open(self.uniqueRunString+str(n).zfill(4)+'.txt', 'wb') as f:
+		with open(self.dataFolder+"step"+str(n).zfill(4)+'.cs', 'wb') as f:
 			cp.dump(self.cs, f, protocol=-1)
 	
