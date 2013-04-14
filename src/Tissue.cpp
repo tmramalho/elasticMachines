@@ -23,14 +23,14 @@ Tissue::Tissue(double k, double l, double d, int nx, int ny, int ns, int ruleID,
 	_numDead = 0;
 	_avEquilib = 0;
 	_avSize = 0;
-	_numSteps = ns;
+	_numMaxSteps = ns;
 	_nIters = 0;
 	allocateCells(mx, my);
 	_mx = mx;
 	_my = my*4;
+	_numTotalSteps = 0;
 
 	std::stringstream app;
-	//TODO: make sure data folder exists, or else this crashes
 	app << "/data/em" << getpid() << time(NULL) << ruleID << "/";
 	_dataFolder = fs::current_path();
 	_dataFolder /= app.str();
@@ -47,6 +47,11 @@ Tissue::~Tissue() {
 }
 
 void Tissue::createTransitionTables(int ruleID) {
+	/*
+	 * A 16 bit integer defines the cellular automaton rules
+	 * The first 8 bits define the transition table
+	 * The last 8 bits the growth table
+	 */
 	transition.assign(8, 0);
 	growth.assign(8, 0);
 	_rid = ruleID;
@@ -73,15 +78,15 @@ void Tissue::evolveCA() {
 	newCellY.clear();
 	for (int j = 0; j < _nCells; j++) {
 		int acc = 0;
-		std::set<int> *nn = nnarr[j];
+		std::set<int> *nn = nnarr[j]; //nearest neighbors
 		for (std::set<int>::iterator it=nn->begin(); it!=nn->end(); ++it)
 			acc += stateA[*it];
-		int s = acc < 3 ? 0 : 1;
-		int p = varr[j] < _pt ? 0 : 1;
-		int x = stateA[j];
+		int s = acc < 3 ? 0 : 1; //accumulator test, 3 was a decision
+		int p = varr[j] < _pt ? 0 : 1; //pressure test
+		int x = stateA[j]; //current state
 		int i = s<<2 | x<<1 | p;
 		stateB[j] = transition[i];
-		if (growth[i] == 1) {
+		if (growth[i] == 1) { //create new cell at this position
 			newCellX.push_back(xarr[j*4 + 3]);
 			newCellY.push_back(yarr[j*4 + 3]);
 		}
@@ -91,41 +96,47 @@ void Tissue::evolveCA() {
 
 void Tissue::run() {
 	clock_t begin = clock();
-	for (int n = 0; n < _numSteps; n++) {
+	for (int n = 0; n < _numMaxSteps; n++) {
+		_numTotalSteps += 1;
 		/*
-		Step 1: reach elastic equilibrium
-		*/
-		if (_numNewCells > 0 || _numDead > 0)
+		 * Step 1: reach elastic equilibrium
+		 */
+		if (_numNewCells > 0 || _numDead > 0) {
 			equilibrate();
+		}
 
 		/*
-		Step 2: save current system state
-		*/
+		 * Step 2: save current system state
+		 */
 		saveCellState(n);
 
 		/*
-		Step 3: update state and add cells
-		*/
+		 * Step 3: update state and add cells
+		 */
 		evolveCA();
 		_numNewCells = newCellX.size();
 
 		/*
-		Step 4: add cells (tCells)
-		*/
+		 * Step 4: add cells (tCells)
+		 */
 		grow();
 		_nCells = fiarr.size();
 
 		/*
-		Step 5: delete cells which went outside the tissue (tCells)
-		*/
+		 * Step 5: delete cells which went outside the tissue (tCells)
+		 */
 		_numDead = deleteRogueCells();
 		_nCells = fiarr.size();
 		if (_nCells > 1000) break;
 	}
-	equilibrate();
+	/*
+	 * if we stopped the loop early the system is not interesting
+	 * thus no need to equilibrate
+	 */
+	if (_numTotalSteps == _numMaxSteps) equilibrate();
 	clock_t end = clock();
 	_rt = double(end - begin) / CLOCKS_PER_SEC;
-	saveCellState(_numSteps);
+	saveCellState(_numMaxSteps);
 	saveParameters();
 }
 
@@ -133,16 +144,21 @@ void Tissue::equilibrate() {
 	int i = 0;
 	while(true) {
 		i++;
-		calcDelaunay();
-		Solver::run(_dt, 2.0, _k, _l, _d, xarr, yarr, vxarr, vyarr, fxarr, fyarr, nnarr, varr, fiarr);
-		double acc = 0;
+		calcDelaunay(); //recalculate links
+		Solver::run(_dt, 2.0, _k, _l, _d, xarr, yarr, vxarr, vyarr, fxarr, fyarr, nnarr, varr, fiarr); //dynamics
+		bool eq = true;
+		/*
+		 * cells must not have moved too much since last iteration
+		 * x and y vert were updated in the delaunay step
+		 */
 		for(int i=0; i < _nCells; i++) {
-			acc += sqrt((xarr[i*4 + 3] - xvert[i])*(xarr[i*4 + 3] - xvert[i]));
-			acc += sqrt((yarr[i*4 + 3] - yvert[i])*(yarr[i*4 + 3] - yvert[i]));
+			if( sqrt((xarr[i*4 + 3] - xvert[i])*(xarr[i*4 + 3] - xvert[i])) > _eqTol
+				|| sqrt((yarr[i*4 + 3] - yvert[i])*(yarr[i*4 + 3] - yvert[i]))  > _eqTol ) {
+				eq = false;
+				break;
+			}
 		}
-		acc /= 2.0 * _nCells;
-		if (acc < _eqTol) break;
-		else acc = 0;
+		if (eq) break;
 	}
 	std::cout << "equilib:" << i << " " << _nCells << std::endl;
 	_avSize += _nCells;
@@ -185,54 +201,40 @@ void Tissue::grow() {
 
 void Tissue::saveParameters() {
 	fs::ofstream file(_dataFolder / "params.txt");
+	writeParameters(file);
+	file.close();
+}
+
+void Tissue::writeParameters(std::ostream& stream) {
 	//some c ugliness
 	char buffer[512];
 	time_t rawtime;
 	time(&rawtime);
 	struct tm * timeinfo = localtime(&rawtime);
 	strftime(buffer, 512, "%d %b %Y %H:%M:%S", timeinfo);
-	file << "Run finished at: " << buffer << std::endl;
-	file << "Automaton rule: " << _rid << std::endl;
-	file << "init num cells x: " << _nx << std::endl;
-	file << "init num cells y: " << _ny << std::endl;
-	file << "pressure threshold: " << _pt << std::endl;
-	file << "lambda: "  << _l << std::endl;
-	file << "stiffness: "  << _k << std::endl;
-	file << "rest length: "  << _d << std::endl;
-	file << "dt: " << _dt << std::endl;
-	file << "number of ca steps: " << _numSteps << std::endl;
-	file << "max x: " << _mx << std::endl;
-	file << "max y: " << _my << std::endl;
-	file << "average equilibration time: " << _avEquilib/(double)_nIters << std::endl;
-	file << "average system size: " << _avSize/(double)_nIters << std::endl;
-	file << "final system size: " << _nCells << std::endl;
-	file << "runtime in seconds: " << _rt << std::endl;
-	file << "state entropy: " << getStateEntropy() << std::endl;
-	file << "network entropy: " << getNetworkEntropy() << std::endl;
-	file.close();
-}
-
-void Tissue::printParameters() {
-	std::cout << "Automaton rule: " << _rid << std::endl;
-	std::cout << "init num cells x: " << _nx << std::endl;
-	std::cout << "init num cells y: " << _ny << std::endl;
-	std::cout << "pressure threshold: " << _pt << std::endl;
-	std::cout << "lambda: "  << _l << std::endl;
-	std::cout << "stiffness: "  << _k << std::endl;
-	std::cout << "rest length: "  << _d << std::endl;
-	std::cout << "dt: " << _dt << std::endl;
-	std::cout << "number of ca steps: " << _numSteps << std::endl;
-	std::cout << "max x: " << _mx << std::endl;
-	std::cout << "max y: " << _my << std::endl;
-	std::cout << "average equilibration time: " << _avEquilib/(double)_nIters << std::endl;
-	std::cout << "average system size: " << _avSize/(double)_nIters << std::endl;
-	std::cout << "final system size: " << _nCells << std::endl;
-	std::cout << "runtime in seconds: " << _rt << std::endl;
-	std::cout << "state entropy: " << getStateEntropy() << std::endl;
-	std::cout << "network entropy: " << getNetworkEntropy() << std::endl;
+	stream << "Run finished at: " << buffer << std::endl;
+	stream << "Automaton rule: " << _rid << std::endl;
+	stream << "init num cells x: " << _nx << std::endl;
+	stream << "init num cells y: " << _ny << std::endl;
+	stream << "pressure threshold: " << _pt << std::endl;
+	stream << "lambda: "  << _l << std::endl;
+	stream << "stiffness: "  << _k << std::endl;
+	stream << "rest length: "  << _d << std::endl;
+	stream << "dt: " << _dt << std::endl;
+	stream << "ca steps requested: " << _numMaxSteps << std::endl;
+	stream << "ca steps run: " << _numTotalSteps << std::endl;
+	stream << "max x: " << _mx << std::endl;
+	stream << "max y: " << _my << std::endl;
+	stream << "average equilibration time: " << _avEquilib/(double)_nIters << std::endl;
+	stream << "average system size: " << _avSize/(double)_nIters << std::endl;
+	stream << "final system size: " << _nCells << std::endl;
+	stream << "runtime in seconds: " << _rt << std::endl;
+	stream << "state entropy: " << getStateEntropy() << std::endl;
+	stream << "network entropy: " << getNetworkEntropy() << std::endl;
 }
 
 void Tissue::saveCellState(int n) {
+	std::cout << "saving " << n << std::endl;
 	char buffer[256];
 	sprintf(buffer, "state%04d.cs", n);
 	fs::ofstream file(_dataFolder / buffer);

@@ -30,7 +30,7 @@ public:
 	int getRuleID();
 	void run();
 	void saveParameters();
-	void printParameters();
+	void writeParameters(std::ostream& stream);
 	double getStateEntropy();
 	double getNetworkEntropy();
 
@@ -43,7 +43,7 @@ private:
 	void saveCellState(int n);
 	void allocateCells(double mx, double my);
 	inline double xlogx(double x);
-	int _nx, _ny, _numNewCells, _numDead, _numSteps, _nIters, _rid, _nCells;
+	int _nx, _ny, _numNewCells, _numDead, _numMaxSteps, _nIters, _rid, _nCells, _numTotalSteps;
 	double _pt, _md, _hd, _eqTol, _dt, _avEquilib, _avSize, _mx, _my, _k, _l, _d, _rt;
 	std::vector<double> xarr;
 	std::vector<double> yarr;
