@@ -41,10 +41,8 @@ class Plotter(object):
 		self.maxylim = 0.501
 		self.pressThresh = pt
 	
-	def calcDelaunay(self, cs):
+	def calcDelaunay(self):
 		#delaunay
-		self.xp = np.copy(cs.x[:,3])
-		self.yp = np.copy(cs.y[:,3])
 		self.tt = triang.Triangulation(self.xp,self.yp)
 		self.edges = [e for e in self.tt.edge_db if dist(e,self.xp,self.yp) < self.md]
 		self.numEdges = len(self.edges)
@@ -70,13 +68,28 @@ class Plotter(object):
 		self.i += 1
 		
 	def setupCellSystem(self, cs):
-		self.calcDelaunay(cs)
-		self.cs = cs
+		self.xp = np.copy(cs.x[:,3])
+		self.yp = np.copy(cs.y[:,3])
+		self.V = np.copy(cs.V)
+		self.state = np.copy(cs.state)
+		self.nCells = cs.size
+		self.setup()
+		
+	def setupFromArrays(self, x, y, s, v):
+		self.xp = x
+		self.yp = y
+		self.state = s
+		self.V = v
+		self.nCells = len(v)
+		self.setup()
+		
+	def setup(self):
+		self.calcDelaunay()
 		dic = self.mapPointsToPos(self.xp, self.yp)
 		self.extedges, op = self.findExternalEdges(self.tt.triangle_nodes, self.xp, self.yp)
 		fx, fy = self.createAuxPoints(self.extedges, op, self.xp, self.yp)
 		self.tri = triang.Triangulation(fx,fy)
-		self.vertices, self.fstate, self.fpress = self.createVertexArrayFromTriangulation(self.cs, self.tri, dic)
+		self.vertices, self.fstate, self.fpress = self.createVertexArrayFromTriangulation(self.tri, dic)
 	
 	def ccworder(self, A):
 		A= A- np.mean(A, 1)[:, None]
@@ -87,11 +100,11 @@ class Plotter(object):
 		fig = plt.figure(figsize=self.figsize)
 		ax = fig.add_subplot(1, 1, 1)
 		#xp, yp is same as c.x, c.y
-		for i in xrange(self.cs.size):
-			ptest = self.cs.V[i] < self.pressThresh
-			if self.cs.state[i] == 1 and ptest:
+		for i in xrange(self.nCells):
+			ptest = self.V[i] < self.pressThresh
+			if self.state[i] == 1 and ptest:
 				co = 'g'
-			elif self.cs.state[i] == 1:
+			elif self.state[i] == 1:
 				co = 'y'
 			elif ptest:
 				co = 'b'
@@ -100,7 +113,7 @@ class Plotter(object):
 			circle = plt.Circle((self.xp[i], self.yp[i]), radius=self.dh, color=co, alpha = 0.5)
 			ax.add_patch(circle)
 			ax.text(self.xp[i], self.yp[i], str(i))
-			ax.text(self.xp[i], self.yp[i]-0.002, "%.2e" % self.cs.V[i], fontsize=9, color='m')
+			ax.text(self.xp[i], self.yp[i]-0.002, "%.2e" % self.V[i], fontsize=9, color='m')
 			
 		for e in self.edges:
 			plt.plot(self.xp[e],self.yp[e], color = 'b')
@@ -163,7 +176,7 @@ class Plotter(object):
 		plt.ylim(self.minylim, self.maxylim)
 		plt.savefig(self.path + "press"+str(self.i).zfill(3)+".png")
 		
-	def createVertexArrayFromTriangulation(self, cs, tri, dic):
+	def createVertexArrayFromTriangulation(self, tri, dic):
 		auxVerts = [[] for _ in xrange(len(tri.x))] #array with number of points
 		for cc, t in zip(tri.circumcenters, tri.triangle_nodes):
 			'''add this circumcenter as a vertex of each of
@@ -186,12 +199,12 @@ class Plotter(object):
 			v = v[vidx]
 			vertices.append(v)
 			#create array with state colors
-			if cs.state[cidx] == 1:
+			if self.state[cidx] == 1:
 				fstate.append('g')
 			else:
 				fstate.append('r')
 			#array with pressure values
-			fpress.append(cs.V[cidx])
+			fpress.append(self.V[cidx])
 		return vertices, fstate, fpress
 		
 	def mapPointsToPos(self, xp, yp):

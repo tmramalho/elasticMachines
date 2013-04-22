@@ -6,6 +6,7 @@ Created on Feb 6, 2013
 
 from tissue import Tissue
 import argparse
+import gc
 
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser(description='Simulate a morphogenetic cellular automaton.')
@@ -51,3 +52,4 @@ if __name__ == '__main__':
 			t = Tissue(args.k, args.l, args.d, args.nx, args.ny, args.ns, i)
 			t.setupDevelopment(args.xe, args.ye)
 			t.run()
+			gc.collect()

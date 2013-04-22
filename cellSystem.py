@@ -102,3 +102,17 @@ class CellSystem():
 		#swap the two arrays
 		self.state, self.newState = self.newState, self.state
 		
+	def entropy(self, freqs):
+		logf = np.zeros_like(freqs)
+		logf[freqs>0] = np.log(freqs[freqs>0])
+		return np.sum(freqs*logf)
+	
+	def getStateEntropy(self):
+		freqs = np.bincount(self.state)/float(self.size)
+		return self.entropy(freqs)
+			
+	def getNetworkEntropy(self):
+		outDegrees = np.array([len(n) for n in self.nn])
+		freqs = np.bincount(outDegrees)/float(self.size)
+		return self.entropy(freqs)
+	

@@ -30,6 +30,7 @@ class Tissue(object):
 		self.solver = Solver(k, l, d)
 		self.md = 2*d
 		self.hd = d/2
+		self.eqTol = d*1e-2
 		self.ca = Automaton(self.pt)
 		self.ca.setRuleID(ruleID)
 		self.dt = 0.01
@@ -41,6 +42,7 @@ class Tissue(object):
 		self.nIters = 0
 		self.dataFolder = os.getcwd() + '/data/em'+str(os.getpid())+str(int(time.time()))+str(ruleID) + "/"
 		os.mkdir(self.dataFolder)
+		print 'Tissue setup for rule ' + str(ruleID)
 		
 	def setupDevelopment(self, maxX, maxY):
 		self.mx = maxX
@@ -96,6 +98,8 @@ class Tissue(object):
 			Step 5: delete cells which went outside the tissue (tCells)
 			'''
 			self.numDead = self.cs.deleteRogueCells(self.my)
+			if self.cs.size > 1000:
+				break
 		
 		self.equilibrate()	
 		t2 = time.time()
@@ -109,8 +113,8 @@ class Tissue(object):
 			self.calcDelaunay()
 			#self.solver.run(self.cs, self.dt, 2)
 			self.solver.fastRun(self.cs, self.dt, 2)
-			tx = np.allclose(self.cs.x[:,3], self.xp)
-			ty = np.allclose(self.cs.y[:,3], self.yp)
+			tx = np.allclose(self.cs.x[:,3], self.xp, atol=self.eqTol)
+			ty = np.allclose(self.cs.y[:,3], self.yp, atol=self.eqTol)
 			if ty and tx:
 				break
 			i += 1
@@ -123,8 +127,12 @@ class Tissue(object):
 		#delaunay
 		self.xp = np.copy(self.cs.x[:,3])
 		self.yp = np.copy(self.cs.y[:,3])
+		try:
+			self.tt = triang.Triangulation(self.xp,self.yp)
+		except KeyError:
+			print "delaunay is frying"
+			return
 		self.cs.forgetAllNeighbors()
-		self.tt = triang.Triangulation(self.xp,self.yp)
 		self.edges = [e for e in self.tt.edge_db if dist(e,self.xp,self.yp) < self.md]
 		self.numEdges = len(self.edges)
 		for e in self.edges:
@@ -155,6 +163,8 @@ class Tissue(object):
 			f.write("average system size: " + str(self.avSize/float(self.nIters)) + "\n")
 			f.write("final system size: " + str(self.cs.size) + "\n")
 			f.write("runtime in seconds: " + self.rt + "\n")
+			f.write("state entropy: " + str(self.cs.getStateEntropy()) + "\n")
+			f.write("network entropy: " + str(self.cs.getNetworkEntropy()) + "\n")
 			
 	def saveCellState(self, n):
 		with open(self.dataFolder+"step"+str(n).zfill(4)+'.cs', 'wb') as f:
