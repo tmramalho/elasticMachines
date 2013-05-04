@@ -34,11 +34,11 @@ Tissue::Tissue(double k, double l, double d, int nx, int ny, int ns, int ruleID,
 	app << "/data/em" << getpid() << time(NULL) << ruleID << "/";
 	_dataFolder = fs::current_path();
 	_dataFolder /= app.str();
-	std::cout << _dataFolder << std::endl;
+	//std::cout << _dataFolder << std::endl;
 	fs::create_directory(_dataFolder);
 	saveCellState(0);
 
-	std::cout << "Tissue setup for rule " << ruleID << std::endl;
+	//std::cout << "Tissue setup for rule " << ruleID << std::endl;
 }
 
 Tissue::~Tissue() {
@@ -63,10 +63,10 @@ void Tissue::createTransitionTables(int ruleID) {
 		growth[i] = (ruleID & 1);
 		ruleID >>= 1;
 	}
-	std::cout << "Rule " << _rid << " : ";
+	/*std::cout << "Rule " << _rid << " : ";
 	for (int i = 0; i < 8; i++) std::cout << transition[i];
 	for (int i = 0; i < 8; i++) std::cout << growth[i];
-	std::cout << std::endl;
+	std::cout << std::endl;*/
 }
 
 int Tissue::getRuleID() {
@@ -144,6 +144,7 @@ void Tissue::equilibrate() {
 	int i = 0;
 	while(true) {
 		i++;
+		if( i > 100 ) break; //emergency break
 		calcDelaunay(); //recalculate links
 		Solver::run(_dt, 2.0, _k, _l, _d, xarr, yarr, vxarr, vyarr, fxarr, fyarr, nnarr, varr, fiarr); //dynamics
 		bool eq = true;
@@ -160,7 +161,7 @@ void Tissue::equilibrate() {
 		}
 		if (eq) break;
 	}
-	std::cout << "equilib:" << i << " " << _nCells << std::endl;
+	//std::cout << "equilib:" << i << " " << _nCells << std::endl;
 	_avSize += _nCells;
 	_avEquilib += i;
 	_nIters += 1;
@@ -234,7 +235,7 @@ void Tissue::writeParameters(std::ostream& stream) {
 }
 
 void Tissue::saveCellState(int n) {
-	std::cout << "saving " << n << std::endl;
+	//std::cout << "saving " << n << std::endl;
 	char buffer[256];
 	sprintf(buffer, "state%04d.cs", n);
 	fs::ofstream file(_dataFolder / buffer);
@@ -338,7 +339,7 @@ void Tissue::allocateCells(double mx, double my) {
 }
 
 double Tissue::getStateEntropy() {
-	double acc;
+	double acc = 0;
 	for(int i=0; i<_nCells; i++) {
 		acc += stateA[i];
 	}
