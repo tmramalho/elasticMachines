@@ -46,7 +46,10 @@ if __name__ == '__main__':
 	pt = float(re.search("pressure threshold: (.+)\n", params).group(1))
 	mx = float(re.search("max x: (.+)\n", params).group(1))
 	my = float(re.search("max y: (.+)\n", params).group(1))
-	steps = int(re.search("number of ca steps: (.+)\n", params).group(1))
+	if args.c:
+		steps = int(re.search("ca steps run: (.+)\n", params).group(1))
+	else:
+		steps = int(re.search("number of ca steps: (.+)\n", params).group(1))
 	
 	if args.ps > 0 and args.ps <= steps:
 		steps = args.ps #plot only until requested frame

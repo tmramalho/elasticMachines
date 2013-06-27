@@ -11,7 +11,6 @@ import matplotlib.colors as colors
 import matplotlib.delaunay.triangulate as triang
 import os
 import itertools
-from csolver import dist
 
 class Plotter(object):
 	'''
@@ -44,7 +43,7 @@ class Plotter(object):
 	def calcDelaunay(self):
 		#delaunay
 		self.tt = triang.Triangulation(self.xp,self.yp)
-		self.edges = [e for e in self.tt.edge_db if dist(e,self.xp,self.yp) < self.md]
+		self.edges = [e for e in self.tt.edge_db if self.dist(e,self.xp,self.yp) < self.md]
 		self.numEdges = len(self.edges)
 	
 	def setLims(self, maxX, maxY):
