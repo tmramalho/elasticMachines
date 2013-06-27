@@ -29,7 +29,6 @@ public:
 	void createTransitionTables(int ruleID);
 	int getRuleID();
 	void run();
-	void saveParameters();
 	void writeParameters(std::ostream& stream);
 	double getStateEntropy();
 	double getNetworkEntropy();
@@ -40,7 +39,7 @@ private:
 	void grow();
 	void evolveCA();
 	int deleteRogueCells();
-	void saveCellState(int n);
+	void saveCellState(int n, std::ostream& stream);
 	void allocateCells(double mx, double my);
 	inline double xlogx(double x);
 	int _nx, _ny, _numNewCells, _numDead, _numMaxSteps, _nIters, _rid, _nCells, _numTotalSteps;

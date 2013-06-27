@@ -36,7 +36,6 @@ Tissue::Tissue(double k, double l, double d, int nx, int ny, int ns, int ruleID,
 	_dataFolder /= app.str();
 	//std::cout << _dataFolder << std::endl;
 	fs::create_directory(_dataFolder);
-	saveCellState(0);
 
 	//std::cout << "Tissue setup for rule " << ruleID << std::endl;
 }
@@ -95,6 +94,8 @@ void Tissue::evolveCA() {
 }
 
 void Tissue::run() {
+	fs::ofstream file(_dataFolder / "params.txt");
+	saveCellState(0, file);
 	clock_t begin = clock();
 	for (int n = 0; n < _numMaxSteps; n++) {
 		_numTotalSteps += 1;
@@ -108,7 +109,7 @@ void Tissue::run() {
 		/*
 		 * Step 2: save current system state
 		 */
-		saveCellState(n);
+		saveCellState(n, file);
 
 		/*
 		 * Step 3: update state and add cells
@@ -127,7 +128,6 @@ void Tissue::run() {
 		 */
 		_numDead = deleteRogueCells();
 		_nCells = fiarr.size();
-		if (_nCells > 1000) break;
 	}
 	/*
 	 * if we stopped the loop early the system is not interesting
@@ -136,8 +136,9 @@ void Tissue::run() {
 	if (_numTotalSteps == _numMaxSteps) equilibrate();
 	clock_t end = clock();
 	_rt = double(end - begin) / CLOCKS_PER_SEC;
-	saveCellState(_numMaxSteps);
-	saveParameters();
+	saveCellState(_numMaxSteps, file);
+	writeParameters(file);
+	file.close();
 }
 
 void Tissue::equilibrate() {
@@ -200,12 +201,6 @@ void Tissue::grow() {
 	Solver::initFreshCell(_numNewCells, _dt, _k, _l, _d, xarr, yarr, vxarr, vyarr, fxarr, fyarr, nnarr, varr, fiarr);
 }
 
-void Tissue::saveParameters() {
-	fs::ofstream file(_dataFolder / "params.txt");
-	writeParameters(file);
-	file.close();
-}
-
 void Tissue::writeParameters(std::ostream& stream) {
 	//some c ugliness
 	char buffer[512];
@@ -234,11 +229,8 @@ void Tissue::writeParameters(std::ostream& stream) {
 	stream << "network entropy: " << getNetworkEntropy() << std::endl;
 }
 
-void Tissue::saveCellState(int n) {
-	//std::cout << "saving " << n << std::endl;
-	char buffer[256];
-	sprintf(buffer, "state%04d.cs", n);
-	fs::ofstream file(_dataFolder / buffer);
+void Tissue::saveCellState(int n, std::ostream& file) {
+	file << "Step " << n << std::endl;
 	for(int i = 0; i < _nCells; i++) {
 		file << xarr[i*4 + 3] << "; ";
 	}
@@ -263,7 +255,7 @@ void Tissue::saveCellState(int n) {
 		}
 		file << "]; ";
 	}
-	file << std::endl;
+	file << std::endl << std::endl;
 }
 
 int Tissue::deleteRogueCells() {
